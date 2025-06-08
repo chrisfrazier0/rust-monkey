@@ -1,6 +1,6 @@
 use std::io::{self, BufRead, Write};
 
-use crate::parser::Parser;
+use crate::{evaluator::eval, parser::Parser};
 
 const PROMPT: &str = ">> ";
 const MONKEY_FACE: &str = r#"            __,__
@@ -41,6 +41,6 @@ pub fn start<R: BufRead, W: Write>(mut input: R, mut output: W) -> io::Result<()
       continue;
     }
 
-    writeln!(output, "{}", program)?;
+    writeln!(output, "{}", eval(&program))?;
   }
 }
