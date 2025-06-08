@@ -1,9 +1,20 @@
 use std::io::{self, BufRead, Write};
 
-use crate::lexer::Lexer;
-use crate::token::TokenType;
+use crate::parser::Parser;
 
 const PROMPT: &str = ">> ";
+const MONKEY_FACE: &str = r#"            __,__
+   .--.  .-"     "-.  .--.
+  / .. \/  .-. .-.  \/ .. \
+ | |  '|  /   Y   \  |'  | |
+ | \   \  \ 0 | 0 /  /   / |
+  \ '- ,\.-"""""""-./, -' /
+   ''-' /_   ^ ^   _\ '-''
+       |  \._   _./  |
+       \   \ '~' /   /
+        '._ '-=-' _.'
+           '-----'
+"#;
 
 pub fn start<R: BufRead, W: Write>(mut input: R, mut output: W) -> io::Result<()> {
   loop {
@@ -15,13 +26,21 @@ pub fn start<R: BufRead, W: Write>(mut input: R, mut output: W) -> io::Result<()
       return Ok(());
     }
 
-    let mut lexer = Lexer::new(line.trim());
-    loop {
-      let token = lexer.next_token();
-      if token.token_type == TokenType::Eof {
-        break;
+    let mut parser = Parser::from(&line);
+    let program = parser.parse_program();
+
+    if !parser.errors.is_empty() {
+      writeln!(
+        output,
+        "{}Woops! We ran into some monkey business here!\nParser errors:",
+        MONKEY_FACE
+      )?;
+      for msg in parser.errors {
+        writeln!(output, "  - {}", msg)?;
       }
-      writeln!(output, "{:?}", token)?;
+      continue;
     }
+
+    writeln!(output, "{}", program)?;
   }
 }

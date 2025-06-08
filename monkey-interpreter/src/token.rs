@@ -1,4 +1,6 @@
-#[derive(PartialEq, Debug)]
+use std::fmt;
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum TokenType {
   True,
   False,
@@ -29,6 +31,40 @@ pub enum TokenType {
   Invalid,
 }
 
+impl fmt::Display for TokenType {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match *self {
+      TokenType::True => write!(f, "true"),
+      TokenType::False => write!(f, "false"),
+      TokenType::Let => write!(f, "let"),
+      TokenType::Ident => write!(f, "<ident>"),
+      TokenType::Int => write!(f, "<int>"),
+      TokenType::Bang => write!(f, "!"),
+      TokenType::Assign => write!(f, "="),
+      TokenType::Plus => write!(f, "+"),
+      TokenType::Minus => write!(f, "-"),
+      TokenType::Slash => write!(f, "/"),
+      TokenType::Asterisk => write!(f, "*"),
+      TokenType::Function => write!(f, "fn"),
+      TokenType::LParen => write!(f, "("),
+      TokenType::RParen => write!(f, ")"),
+      TokenType::LBrace => write!(f, "{{"),
+      TokenType::RBrace => write!(f, "}}"),
+      TokenType::If => write!(f, "if"),
+      TokenType::Else => write!(f, "else"),
+      TokenType::Eq => write!(f, "=="),
+      TokenType::NotEq => write!(f, "!="),
+      TokenType::LessThan => write!(f, "<"),
+      TokenType::GreaterThan => write!(f, ">"),
+      TokenType::Comma => write!(f, ","),
+      TokenType::Semicolon => write!(f, ";"),
+      TokenType::Return => write!(f, "return"),
+      TokenType::Eof => write!(f, "<eof>"),
+      TokenType::Invalid => write!(f, "<invalid>"),
+    }
+  }
+}
+
 impl From<&str> for TokenType {
   fn from(value: &str) -> Self {
     match value {
@@ -44,7 +80,7 @@ impl From<&str> for TokenType {
   }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Token {
   pub token_type: TokenType,
   pub literal: String,
