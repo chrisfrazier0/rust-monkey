@@ -1,9 +1,10 @@
-use std::mem::discriminant;
+use std::{mem::discriminant, rc::Rc};
 
 use crate::{
   ast::{
-    BlockStatement, Boolean, ExpressionStatement, Identifier, IfExpression, InfixExpression,
-    Integer, LetStatement, Node, PrefixExpression, Program, ReturnStatement, Statement,
+    BlockStatement, Boolean, ExpressionStatement, Function, Identifier, IfExpression,
+    InfixExpression, Integer, LetStatement, Node, PrefixExpression, Program, ReturnStatement,
+    Statement,
   },
   object::{Environment, Object, Value},
 };
@@ -56,6 +57,8 @@ pub fn eval(node: &dyn Node, env: &mut Environment) -> Value {
     }
   } else if let Some(if_expr) = node.as_any().downcast_ref::<IfExpression>() {
     return eval_if_expression(if_expr, env);
+  } else if let Some(fe) = node.as_any().downcast_ref::<Function>() {
+    return Value::Function(Rc::new(fe), env.clone());
   } else if let Some(il) = node.as_any().downcast_ref::<Integer>() {
     return Value::Wrap(Object::Integer(il.value));
   } else if let Some(b) = node.as_any().downcast_ref::<Boolean>() {
@@ -371,6 +374,19 @@ mod tests {
     for (input, obj) in tests {
       let result = test_eval(input);
       assert_eq!(result, Value::Wrap(obj));
+    }
+  }
+
+  #[test]
+  fn eval_function_object() {
+    let input = "fn(x) { x + 2; };";
+    let result = test_eval(input);
+    if let Value::Function(f, _) = result {
+      assert_eq!(f.parameters.len(), 1);
+      assert_eq!(f.parameters[0].value, "x");
+      assert_eq!(f.body.to_string(), "(x + 2);");
+    } else {
+      panic!("Expected a function, got: {:?}", result);
     }
   }
 

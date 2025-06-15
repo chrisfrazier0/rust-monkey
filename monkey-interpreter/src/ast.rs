@@ -2,29 +2,14 @@ use std::{any::Any, fmt};
 
 use crate::token::Token;
 
-pub trait Statement: Node {}
-pub trait Expression: Node {}
-pub trait Node: Any + fmt::Display {
+pub trait Node: fmt::Display + fmt::Debug {
   fn token_literal(&self) -> String;
   fn as_any(&self) -> &dyn Any;
 }
 
-macro_rules! impl_node {
-  ($type:ty, $kind:ty) => {
-    impl $kind for $type {}
-    impl Node for $type {
-      fn token_literal(&self) -> String {
-        self.token.literal.clone()
-      }
-      fn as_any(&self) -> &dyn Any {
-        self
-      }
-    }
-  };
-}
-
+#[derive(Debug, Clone)]
 pub struct Program {
-  pub statements: Vec<Box<dyn Statement>>,
+  pub statements: Vec<Statement>,
 }
 
 impl Node for Program {
@@ -50,29 +35,100 @@ impl fmt::Display for Program {
   }
 }
 
-pub struct BlockStatement {
-  pub token: Token,
-  pub statements: Vec<Box<dyn Statement>>,
+#[derive(Debug, Clone)]
+pub enum Statement {
+  Let(LetStatement),
+  Return(ReturnStatement),
+  Expression(ExpressionStatement),
+  Block(BlockStatement),
 }
 
-impl_node!(BlockStatement, Statement);
-impl fmt::Display for BlockStatement {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut out = vec![];
-    for stmt in &self.statements {
-      out.push(stmt.to_string());
+impl Node for Statement {
+  fn token_literal(&self) -> String {
+    match self {
+      Statement::Let(s) => s.token_literal(),
+      Statement::Return(s) => s.token_literal(),
+      Statement::Expression(s) => s.token_literal(),
+      Statement::Block(s) => s.token_literal(),
     }
-    write!(f, "{}", out.join("\n"))
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
   }
 }
 
+impl fmt::Display for Statement {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Statement::Let(s) => s.fmt(f),
+      Statement::Return(s) => s.fmt(f),
+      Statement::Expression(s) => s.fmt(f),
+      Statement::Block(s) => s.fmt(f),
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub enum Expression {
+  Identifier(Identifier),
+  Integer(Integer),
+  Boolean(Boolean),
+  Prefix(Box<PrefixExpression>),
+  Infix(Box<InfixExpression>),
+  If(Box<IfExpression>),
+  Function(Box<Function>),
+  Call(Box<CallExpression>),
+}
+
+impl Node for Expression {
+  fn token_literal(&self) -> String {
+    match self {
+      Expression::Identifier(e) => e.token_literal(),
+      Expression::Integer(e) => e.token_literal(),
+      Expression::Boolean(e) => e.token_literal(),
+      Expression::Prefix(e) => e.token_literal(),
+      Expression::Infix(e) => e.token_literal(),
+      Expression::If(e) => e.token_literal(),
+      Expression::Function(e) => e.token_literal(),
+      Expression::Call(e) => e.token_literal(),
+    }
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
+impl fmt::Display for Expression {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Expression::Identifier(e) => e.fmt(f),
+      Expression::Integer(e) => e.fmt(f),
+      Expression::Boolean(e) => e.fmt(f),
+      Expression::Prefix(e) => e.fmt(f),
+      Expression::Infix(e) => e.fmt(f),
+      Expression::If(e) => e.fmt(f),
+      Expression::Function(e) => e.fmt(f),
+      Expression::Call(e) => e.fmt(f),
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
 pub struct LetStatement {
   pub token: Token,
   pub name: Identifier,
-  pub value: Option<Box<dyn Expression>>,
+  pub value: Option<Box<Expression>>,
 }
 
-impl_node!(LetStatement, Statement);
+impl Node for LetStatement {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for LetStatement {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let value_str = self
@@ -84,12 +140,21 @@ impl fmt::Display for LetStatement {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct ReturnStatement {
   pub token: Token,
-  pub value: Option<Box<dyn Expression>>,
+  pub value: Option<Box<Expression>>,
 }
 
-impl_node!(ReturnStatement, Statement);
+impl Node for ReturnStatement {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for ReturnStatement {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let value_str = self
@@ -101,12 +166,21 @@ impl fmt::Display for ReturnStatement {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct ExpressionStatement {
   pub token: Token,
-  pub expr: Option<Box<dyn Expression>>,
+  pub expr: Option<Box<Expression>>,
 }
 
-impl_node!(ExpressionStatement, Statement);
+impl Node for ExpressionStatement {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for ExpressionStatement {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let expr_str = self
@@ -114,17 +188,51 @@ impl fmt::Display for ExpressionStatement {
       .as_ref()
       .map(|e| e.to_string())
       .unwrap_or("".to_string());
-    write!(f, "{};", expr_str,)
+    write!(f, "{};", expr_str)
   }
 }
 
+#[derive(Debug, Clone)]
+pub struct BlockStatement {
+  pub token: Token,
+  pub statements: Vec<Statement>,
+}
+
+impl Node for BlockStatement {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
+impl fmt::Display for BlockStatement {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let mut out = vec![];
+    for stmt in &self.statements {
+      out.push(stmt.to_string());
+    }
+    write!(f, "{}", out.join("\n"))
+  }
+}
+
+#[derive(Debug, Clone)]
 pub struct PrefixExpression {
   pub token: Token,
   pub operator: String,
-  pub right: Option<Box<dyn Expression>>,
+  pub right: Option<Box<Expression>>,
 }
 
-impl_node!(PrefixExpression, Expression);
+impl Node for PrefixExpression {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for PrefixExpression {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let right_str = self
@@ -136,14 +244,23 @@ impl fmt::Display for PrefixExpression {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct InfixExpression {
   pub token: Token,
-  pub left: Box<dyn Expression>,
+  pub left: Box<Expression>,
   pub operator: String,
-  pub right: Option<Box<dyn Expression>>,
+  pub right: Option<Box<Expression>>,
 }
 
-impl_node!(InfixExpression, Expression);
+impl Node for InfixExpression {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for InfixExpression {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let right_str = self
@@ -155,14 +272,23 @@ impl fmt::Display for InfixExpression {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct IfExpression {
   pub token: Token,
-  pub condition: Option<Box<dyn Expression>>,
+  pub condition: Option<Box<Expression>>,
   pub consequence: BlockStatement,
   pub alternative: Option<BlockStatement>,
 }
 
-impl_node!(IfExpression, Expression);
+impl Node for IfExpression {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for IfExpression {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let mut out = format!(
@@ -181,49 +307,85 @@ impl fmt::Display for IfExpression {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct Identifier {
   pub token: Token,
   pub value: String,
 }
 
-impl_node!(Identifier, Expression);
+impl Node for Identifier {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for Identifier {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.value)
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct Boolean {
   pub token: Token,
   pub value: bool,
 }
 
-impl_node!(Boolean, Expression);
+impl Node for Boolean {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for Boolean {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.value)
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct Integer {
   pub token: Token,
   pub value: i32,
 }
 
-impl_node!(Integer, Expression);
+impl Node for Integer {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for Integer {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.value)
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct Function {
   pub token: Token,
   pub parameters: Vec<Identifier>,
   pub body: BlockStatement,
 }
 
-impl_node!(Function, Expression);
+impl Node for Function {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let params = self
@@ -237,18 +399,27 @@ impl fmt::Display for Function {
       "{}({}) {{ {} }}",
       self.token_literal(),
       params,
-      self.body,
+      self.body
     )
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct CallExpression {
   pub token: Token,
-  pub function: Box<dyn Expression>, // Identifier or Function
-  pub arguments: Vec<Box<dyn Expression>>,
+  pub function: Box<Expression>,
+  pub arguments: Vec<Box<Expression>>,
 }
 
-impl_node!(CallExpression, Expression);
+impl Node for CallExpression {
+  fn token_literal(&self) -> String {
+    self.token.literal.clone()
+  }
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+}
+
 impl fmt::Display for CallExpression {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let args = self
@@ -269,16 +440,16 @@ mod tests {
   #[test]
   fn parser_program_to_string() {
     let program = Program {
-      statements: vec![Box::new(LetStatement {
+      statements: vec![Statement::Let(LetStatement {
         token: Token::new(TokenType::Let, "let"),
         name: Identifier {
           token: Token::new(TokenType::Ident, "myVar"),
           value: "myVar".to_string(),
         },
-        value: Some(Box::new(Identifier {
+        value: Some(Box::new(Expression::Identifier(Identifier {
           token: Token::new(TokenType::Ident, "anotherVar"),
           value: "anotherVar".to_string(),
-        })),
+        }))),
       })],
     };
     assert_eq!(program.to_string(), "let myVar = anotherVar;");
