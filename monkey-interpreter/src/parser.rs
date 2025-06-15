@@ -65,7 +65,7 @@ impl Parser {
       if let Some(stmt) = self.parse_statement() {
         program.statements.push(stmt);
       }
-      if !self.current_is(&TokenType::Semicolon) {
+      if !self.current_is(&TokenType::Semicolon) && !self.peek_is(&TokenType::Eof) {
         self.semicolon_error(&self.current_token.token_type.clone());
       }
       self.next_token();
@@ -126,9 +126,12 @@ impl Parser {
   fn parse_return_statement(&mut self) -> ReturnStatement {
     let token = self.current_token.clone();
     self.next_token();
-    let value = self.parse_expression(Precedence::Lowest);
-    if self.peek_is(&TokenType::Semicolon) {
-      self.next_token();
+    let mut value = None;
+    if !self.current_is(&TokenType::Semicolon) {
+      value = self.parse_expression(Precedence::Lowest);
+      if self.peek_is(&TokenType::Semicolon) {
+        self.next_token();
+      }
     }
     ReturnStatement { token, value }
   }
@@ -300,7 +303,7 @@ impl Parser {
     self.next_token();
     Box::new(InfixExpression {
       token,
-      left: left,
+      left,
       operator,
       right: self.parse_expression(precedence),
     })

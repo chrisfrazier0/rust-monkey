@@ -1,17 +1,21 @@
 use crate::{
   ast::{
     BlockStatement, Boolean, ExpressionStatement, IfExpression, InfixExpression, Integer, Node,
-    PrefixExpression, Program, Statement,
+    PrefixExpression, Program, ReturnStatement, Statement,
   },
-  object::{FALSE, Object, TRUE},
+  object::{Object, Value},
 };
 
-pub fn eval(node: &dyn Node) -> Object {
+pub fn eval(node: &dyn Node) -> Value {
   // Statements
   if let Some(p) = node.as_any().downcast_ref::<Program>() {
     return eval_statements(&p.statements);
   } else if let Some(bs) = node.as_any().downcast_ref::<BlockStatement>() {
     return eval_statements(&bs.statements);
+  } else if let Some(rs) = node.as_any().downcast_ref::<ReturnStatement>() {
+    if let Some(ref val) = rs.value {
+      return eval(val.as_ref()).into_return();
+    }
   } else if let Some(es) = node.as_any().downcast_ref::<ExpressionStatement>() {
     if let Some(ref expr) = es.expr {
       return eval(expr.as_ref());
@@ -33,64 +37,67 @@ pub fn eval(node: &dyn Node) -> Object {
   } else if let Some(if_expr) = node.as_any().downcast_ref::<IfExpression>() {
     return eval_if_expression(if_expr);
   } else if let Some(il) = node.as_any().downcast_ref::<Integer>() {
-    return Object::Integer(il.value);
+    return Value::Wrap(Object::Integer(il.value));
   } else if let Some(b) = node.as_any().downcast_ref::<Boolean>() {
-    return bool_to_object(b.value);
+    return bool_to_value(b.value);
   }
 
   // Default
-  Object::Null
+  Value::Wrap(Object::Null)
 }
 
-fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Object {
-  let mut result = Object::Null;
+fn eval_statements(statements: &Vec<Box<dyn Statement>>) -> Value {
+  let mut result = Value::Wrap(Object::Null);
   for stmt in statements {
     result = eval(stmt.as_ref());
+    if matches!(result, Value::Return(_)) {
+      return result;
+    }
   }
   result
 }
 
-fn eval_prefix_expression(op: &str, right: &Object) -> Object {
+fn eval_prefix_expression(op: &str, right: &Value) -> Value {
   match op {
     "!" => eval_bang_operator(right),
     "-" => eval_minus_operator(right),
-    _ => Object::Null,
+    _ => Value::Wrap(Object::Null),
   }
 }
 
-fn eval_infix_expression(op: &str, left: &Object, right: &Object) -> Object {
-  match (left, right) {
+fn eval_infix_expression(op: &str, left: &Value, right: &Value) -> Value {
+  match (left.unbox(), right.unbox()) {
     (Object::Integer(l), Object::Integer(r)) => eval_infix_integers(op, l, r),
     (Object::Boolean(l), Object::Boolean(r)) => eval_infix_booleans(op, l, r),
-    _ => Object::Null,
+    _ => Value::Wrap(Object::Null),
   }
 }
 
-fn eval_infix_integers(op: &str, left: &i32, right: &i32) -> Object {
+fn eval_infix_integers(op: &str, left: &i32, right: &i32) -> Value {
   match op {
-    "+" => Object::Integer(left + right),
-    "-" => Object::Integer(left - right),
-    "*" => Object::Integer(left * right),
-    "/" => Object::Integer(left / right),
-    "<" => bool_to_object(left < right),
-    ">" => bool_to_object(left > right),
-    "==" => bool_to_object(left == right),
-    "!=" => bool_to_object(left != right),
-    _ => Object::Null,
+    "+" => Value::Wrap(Object::Integer(left + right)),
+    "-" => Value::Wrap(Object::Integer(left - right)),
+    "*" => Value::Wrap(Object::Integer(left * right)),
+    "/" => Value::Wrap(Object::Integer(left / right)),
+    "<" => bool_to_value(left < right),
+    ">" => bool_to_value(left > right),
+    "==" => bool_to_value(left == right),
+    "!=" => bool_to_value(left != right),
+    _ => Value::Wrap(Object::Null),
   }
 }
 
-fn eval_infix_booleans(op: &str, left: &bool, right: &bool) -> Object {
+fn eval_infix_booleans(op: &str, left: &bool, right: &bool) -> Value {
   match op {
-    "==" => bool_to_object(left == right),
-    "!=" => bool_to_object(left != right),
-    _ => Object::Null,
+    "==" => bool_to_value(left == right),
+    "!=" => bool_to_value(left != right),
+    _ => Value::Wrap(Object::Null),
   }
 }
 
-pub fn eval_if_expression(node: &IfExpression) -> Object {
+pub fn eval_if_expression(node: &IfExpression) -> Value {
   let Some(condition) = &node.condition else {
-    return Object::Null;
+    return Value::Wrap(Object::Null);
   };
   let condition_obj = eval(condition.as_ref());
   if is_truthy(&condition_obj) {
@@ -98,36 +105,40 @@ pub fn eval_if_expression(node: &IfExpression) -> Object {
   } else if let Some(alt) = &node.alternative {
     return eval(alt);
   }
-  Object::Null
+  Value::Wrap(Object::Null)
 }
 
-fn eval_bang_operator(target: &Object) -> Object {
-  match target {
-    &TRUE => FALSE,
-    &FALSE => TRUE,
-    Object::Null => TRUE,
-    _ => FALSE,
+fn eval_bang_operator(target: &Value) -> Value {
+  match target.unbox() {
+    Object::Boolean(true) => Value::Wrap(Object::Boolean(false)),
+    Object::Boolean(false) => Value::Wrap(Object::Boolean(true)),
+    Object::Null => Value::Wrap(Object::Boolean(true)),
+    _ => Value::Wrap(Object::Boolean(false)),
   }
 }
 
-fn eval_minus_operator(target: &Object) -> Object {
-  match target {
-    &TRUE => TRUE,
-    &FALSE => FALSE,
-    &Object::Null => Object::Null,
-    &Object::Integer(x) => Object::Integer(-x),
+fn eval_minus_operator(target: &Value) -> Value {
+  match target.unbox() {
+    Object::Boolean(true) => Value::Wrap(Object::Boolean(true)),
+    Object::Boolean(false) => Value::Wrap(Object::Boolean(false)),
+    Object::Null => Value::Wrap(Object::Null),
+    Object::Integer(x) => Value::Wrap(Object::Integer(-x)),
   }
 }
 
-fn bool_to_object(b: bool) -> Object {
-  if b { TRUE } else { FALSE }
+fn bool_to_value(b: bool) -> Value {
+  if b {
+    Value::Wrap(Object::Boolean(true))
+  } else {
+    Value::Wrap(Object::Boolean(false))
+  }
 }
 
-fn is_truthy(obj: &Object) -> bool {
-  match obj {
-    &Object::Null => false,
-    &TRUE => true,
-    &FALSE => false,
+fn is_truthy(obj: &Value) -> bool {
+  match obj.unbox() {
+    Object::Null => false,
+    Object::Boolean(true) => true,
+    Object::Boolean(false) => false,
     _ => true,
   }
 }
@@ -147,7 +158,7 @@ mod tests {
     ];
     for (input, obj) in tests {
       let result = test_eval(input);
-      assert_eq!(result, obj);
+      assert_eq!(result, Value::Wrap(obj));
     }
   }
 
@@ -176,7 +187,7 @@ mod tests {
     ];
     for (input, obj) in tests {
       let result = test_eval(input);
-      assert_eq!(result, obj);
+      assert_eq!(result, Value::Wrap(obj));
     }
   }
 
@@ -189,23 +200,23 @@ mod tests {
     ];
     for (input, obj) in tests {
       let result = test_eval(input);
-      assert_eq!(result, obj);
+      assert_eq!(result, Value::Wrap(obj));
     }
   }
 
   #[test]
   fn eval_bang_operator() {
     let tests = vec![
-      ("!true;", FALSE),
-      ("!false;", TRUE),
-      ("!5;", FALSE),
-      ("!!true;", TRUE),
-      ("!!false", FALSE),
-      ("!!5", TRUE),
+      ("!true;", Object::Boolean(false)),
+      ("!false;", Object::Boolean(true)),
+      ("!5;", Object::Boolean(false)),
+      ("!!true;", Object::Boolean(true)),
+      ("!!false", Object::Boolean(false)),
+      ("!!5", Object::Boolean(true)),
     ];
     for (input, obj) in tests {
       let result = test_eval(input);
-      assert_eq!(result, obj);
+      assert_eq!(result, Value::Wrap(obj));
     }
   }
 
@@ -230,7 +241,7 @@ mod tests {
     ];
     for (input, obj) in tests {
       let result = test_eval(input);
-      assert_eq!(result, obj);
+      assert_eq!(result, Value::Wrap(obj));
     }
   }
 
@@ -247,11 +258,36 @@ mod tests {
     ];
     for (input, obj) in tests {
       let result = test_eval(input);
-      assert_eq!(result, obj);
+      assert_eq!(result, Value::Wrap(obj));
     }
   }
 
-  fn test_eval(input: &str) -> Object {
+  #[test]
+  fn eval_return_statements() {
+    let tests = vec![
+      ("return 10;", Object::Integer(10)),
+      ("return 10; 9;", Object::Integer(10)),
+      ("return 2*5; 9;", Object::Integer(10)),
+      ("9; return 2 * 5; 9;", Object::Integer(10)),
+      (
+        r#"
+        if (10 > 1) {
+          if (10 > 1) {
+            return 10;
+          }
+          return 1;
+        };
+        "#,
+        Object::Integer(10),
+      ),
+    ];
+    for (input, obj) in tests {
+      let result = test_eval(input);
+      assert_eq!(result, Value::Return(obj));
+    }
+  }
+
+  fn test_eval(input: &str) -> Value {
     let program = Parser::from(input).parse_program();
     eval(&program)
   }
