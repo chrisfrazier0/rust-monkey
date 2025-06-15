@@ -4,13 +4,15 @@ use std::fmt;
 pub enum Value {
   Wrap(Object),
   Return(Object),
+  Error(String),
 }
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Value::Wrap(obj) => write!(f, "{}", obj),
-      Value::Return(obj) => write!(f, "{}", obj),
+      Self::Wrap(obj) => write!(f, "{}", obj),
+      Self::Return(obj) => write!(f, "{}", obj),
+      Self::Error(str) => write!(f, "ERROR {}", str),
     }
   }
 }
@@ -19,13 +21,14 @@ impl Value {
   pub fn into_return(self) -> Value {
     match self {
       Self::Wrap(o) => Self::Return(o),
-      Self::Return(_) => self,
+      Self::Return(_) | Self::Error(_) => self,
     }
   }
 
-  pub fn unbox(&self) -> &Object {
+  pub fn unbox(&self) -> Option<&Object> {
     match self {
-      Value::Wrap(o) | Value::Return(o) => o,
+      Value::Wrap(o) | Value::Return(o) => Some(o),
+      Value::Error(_) => None,
     }
   }
 }
