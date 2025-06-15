@@ -3,7 +3,6 @@
 - unicode
 - optional if parens
 - improved semi colon handling (enforced)
-- Better block statement support
 - null returns
 
 - if else if ??
